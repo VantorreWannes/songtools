@@ -31,7 +31,7 @@ class WavFile:
         )
         return struct.unpack(f"<{len(padded) // 4}i", padded)
 
-    def parse(self) -> Sound:
+    def parse(self, pitch: Pitch) -> Sound:
         with self.path.open("rb") as f, wave.open(f, "rb") as w:
             channel_bytes = w.getsampwidth()
             channel_count = w.getnchannels()
@@ -45,7 +45,7 @@ class WavFile:
                 for i in range(0, len(samples), channel_count)
             ]
 
-        return Sound(Buffer("f", (s / max_val for s in samples)), Pitch(60))
+        return Sound(Buffer("f", (s / max_val for s in samples)), pitch)
 
     def save(self, sound: Sound) -> None:
         pcm16 = array(
