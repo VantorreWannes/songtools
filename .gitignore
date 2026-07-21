@@ -219,3 +219,7 @@ __marimo__/
 
 # Other
 scripts/
+hat.wav
+kick.wav
+synth.wav
+src/songtools/transports.py

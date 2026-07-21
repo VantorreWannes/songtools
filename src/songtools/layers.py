@@ -1,14 +1,38 @@
+import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from songtools.transports import export, play
+
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from songtools.tunes import Tune
-    from songtools.types import Effect
+    from songtools.types import Effect, Event
 
 
 @dataclass(frozen=True, slots=True)
 class Layer:
     tunes: tuple[Tune, ...]
+
+    @property
+    def beats(self) -> int:
+        return math.lcm(*(tune.beats for tune in self.tunes))
+
+    def compile(self) -> list[Event]:
+        events = [
+            event.shifted(loop * tune.beats)
+            for tune in self.tunes
+            for loop in range(self.beats // tune.beats)
+            for event in tune.compile()
+        ]
+        return sorted(events, key=lambda event: event.beat)
+
+    def play(self, beats_per_minute: float) -> None:
+        play(self, beats_per_minute)
+
+    def export(self, path: Path, bpm: float) -> None:
+        export(self, bpm, path)
 
     def with_effect(self, effect: Effect) -> Layer:
         tunes = tuple(tune.with_effect(effect) for tune in self.tunes)

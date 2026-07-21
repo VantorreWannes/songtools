@@ -51,5 +51,5 @@ beat   = Tune(hat, hat, kick) * 3
 chords = Tune(keys @ Chords.I, keys @ Chords.IV, keys @ Chords.V) * 2
 
 song = beat & (Tune(None) * 3 + chords)
-play(song, bpm=120)
+song.play(beats_per_minute=120)
 ```

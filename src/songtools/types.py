@@ -8,9 +8,20 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from datetime import timedelta
 
+    from songtools.sounds import Sound
+
 Buffer = array[float]
 SILENCE = Buffer("f", [0.0])
 SAMPLE_RATE = 48000
+
+
+@dataclass(frozen=True, slots=True)
+class Event:
+    beat: float
+    sound: Sound
+
+    def shifted(self, beats: float) -> Event:
+        return Event(self.beat + beats, self.sound)
 
 
 class KeyRoot(IntEnum):
@@ -74,7 +85,7 @@ class Decay:
     duration: timedelta
 
     def apply(self, buffer: Buffer) -> Buffer:
-        constant = 1.0 / (self.duration.seconds * SAMPLE_RATE)
+        constant = 1.0 / (self.duration.total_seconds() * SAMPLE_RATE)
         return Buffer("f", (s * math.exp(-i * constant) for i, s in enumerate(buffer)))
 
 
