@@ -43,7 +43,7 @@ class Tune:
     def shifted(self, beats: float) -> Layer:
         return Layer((self,), beats)
 
-    def stretch(self, beats: int) -> Tune:
+    def every(self, beats: int) -> Tune:
         stretched = tuple(
             slot for sound in self.sounds for slot in (sound, *((REST,) * (beats - 1)))
         )
