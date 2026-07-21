@@ -19,7 +19,6 @@ class Sound:
     def __matmul__(self, other: Key) -> KeyedSound: ...
     @overload
     def __matmul__(self, other: Effect) -> Sound: ...
-
     def __matmul__(self, other: Effect | Key) -> Sound | KeyedSound:
         """Apply the specified `Effect` to this sound."""
         if isinstance(other, Key):

@@ -109,7 +109,7 @@ class ReSample:
     rate: float
 
     def apply(self, buffer: Buffer) -> Buffer:
-        length = max(1, int(len(buffer) / SAMPLE_RATE))
+        length = max(1, int(len(buffer) / self.rate))
         last = len(buffer) - 1
         output = SILENCE * length
         for i in range(length):
@@ -127,6 +127,14 @@ class Pitch:
     def apply(self, buffer: Buffer) -> Buffer:
         rate = 2 ** ((self.midi - 60) / 12)
         return ReSample(rate=rate).apply(buffer)
+
+
+@dataclass(frozen=True, slots=True)
+class Gate:
+    seconds: float
+
+    def apply(self, buffer: Buffer) -> Buffer:
+        return buffer[: int(self.seconds * SAMPLE_RATE)]
 
 
 class Instrument(SimpleNamespace): ...
