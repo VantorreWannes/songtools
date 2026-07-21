@@ -40,7 +40,6 @@ class Sound:
         return KeyedSound(Pitch(60 + shift).apply(self.buffer), key.note(0), key)
 
     def compile(self) -> Sound:
-        """Compile this sound into a `Sound` instance (identity)."""
         return Sound(self.buffer, self.tuned_at)
 
     @overload
