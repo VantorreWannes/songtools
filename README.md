@@ -1,55 +1,147 @@
-# Music DSL — Core
+# songtools
 
-**Philosophy:** Notes carry expression, structure carries time.
-`play` owns absolute time (bpm). `Tune` owns relative time.
-No magic strings, no duplicate logic or state.
+A Python DSL for composing music from code. Notes carry expression, structure carries time. No magic strings, no duplicate logic or state.
 
-## Abstractions (5)
+## Install
 
-| Name         | What it is                                           |
-| ------------ | ---------------------------------------------------- |
-| `Sound`      | A voice (sample or synth). Knows timbre, never time. |
-| `Key`        | Harmonic context: root + scale.                      |
-| `Tune`       | Anything arranged in time. Pure data — no methods.   |
-| `play()`     | The transport. Owns bpm and output.                  |
-| `Instrument` | Optional namespace grouping Sounds.                  |
+```bash
+uv pip install -e .
+```
 
-## Operators (the whole surface)
+Requires Python 3.14+ and [sounddevice](https://python-sounddevice.readthedocs.io/) (PortAudio backend).
 
-| Op          | Meaning                                      |
-| ----------- | -------------------------------------------- |
-| `Tune(...)` | slots of 1 beat; nesting subdivides          |
-| `a + b`     | a, then b                                    |
-| `a * n`     | repeat                                       |
-| `a & b`     | together — shorter side loops to LCM         |
-| `x @ y`     | realize: left plays right, in left's context |
+## Core idea
 
-- `None` = rest (inside a `Tune`)
+`Sound` knows timbre, never time. `Tune` owns relative time. `play` / `compile` own absolute time (bpm). Combine them with operators and you get a tiny, composable music language.
+
+## Abstractions
+
+| Name                   | What it is                                                     |
+| ---------------------- | -------------------------------------------------------------- |
+| `Sound`                | A voice (sample or synth). Knows timbre, never time.           |
+| `Key`                  | Harmonic context: root + scale + quality.                      |
+| `Tune`                 | Anything arranged in time. Pure data — no methods that mutate. |
+| `Layer`                | Parallel voices. Shorter sides loop to LCM.                    |
+| `compile()` / `play()` | The transport. Owns bpm and output.                            |
+
+## Operators
+
+| Op              | Meaning                                      |
+| --------------- | -------------------------------------------- |
+| `Tune(a, b, c)` | Slots of 1 beat; nesting subdivides          |
+| `a + b`         | a, then b (sequence)                         |
+| `a * n`         | repeat                                       |
+| `a & b`         | together — shorter side loops to LCM         |
+| `x @ y`         | realize: left plays right, in left's context |
+
+`None` is not used — use `REST` for a rest inside a `Tune`.
 
 ## Vocabulary
 
-- Notes: `C`, `D`, `E`, ...
-- `Scales.MAJOR`, `Scales.MINOR`, ...
-- `Chords.I`, `Chords.IV`, `Chords.V`, ... — quality emerges from Key × degree
-- `Degrees.I`, `Degrees.III`, ... — single tones
+- Notes: `KeyRoot.C`, `KeyRoot.D`, ... (chromatic, 0–11)
+- Scales: `Scale.MAJOR`, `Scale.MINOR`, `Scale.DORIAN`
+- Qualities: `Quality.TRIAD`, `Quality.SEVENTH`, `Quality.NINTH`, `Quality.SUS2`, `Quality.SUS4`, `Quality.POWER`
+- Degrees: `Degree.I`, `Degree.II`, ... `Degree.VII` (also used as chord symbols)
 
-## Rules
+## Effects
 
-- Slot = 1 beat. Want it faster? Nest. Slower? Spread with `None`. Global speed? bpm.
-- Want a variation? Write it: `groove * 3 + fill`.
-- Never name a chord's quality — it falls out of Key × degree.
-- Transpose a whole layer: change one `Key` constant. Drums don't move.
-- `@` chains left-to-right: `synth @ key @ Chords.IV`.
+Chain on any `Sound` with `@`:
 
-## Example
+| Effect               | What it does                   |
+| -------------------- | ------------------------------ |
+| `Gain(amount)`       | Multiply amplitude             |
+| `Decay(duration)`    | Exponential fade (`timedelta`) |
+| `LowPass(hertz)`     | One-pole lowpass filter        |
+| `Echo(seconds)`      | Single-tap delay at −6 dB      |
+| `Gate(seconds)`      | Hard cut to length             |
+| `Reverse`            | Reverse the buffer             |
+| `Drive(amount)`      | Tanh saturation                |
+| `Humanize(velocity)` | Subtle gain variation          |
+
+## Quick start
+
+### 1. Generate some sounds
+
+```bash
+python scripts/sounds.py     # writes pluck.wav, kick.wav, snare.wav, hat.wav
+```
+
+### 2. Compose
 
 ```python
-hat, kick = Sound("sounds/high_hat.wav"), Sound("sounds/kick.wav")
-keys = Sound("sounds/synth_1.wav") @ Key(C, Scales.MAJOR)
+from datetime import timedelta
 
-beat   = Tune(hat, hat, kick) * 3
-chords = Tune(keys @ Chords.I, keys @ Chords.IV, keys @ Chords.V) * 2
+from songtools.files import WavFile
+from songtools.keys import Key
+from songtools.sounds import REST, Sound
+from songtools.tunes import Tune
+from songtools.types import (
+    Decay,
+    Degree,
+    Echo,
+    Gain,
+    KeyRoot,
+    LowPass,
+    Pitch,
+    Quality,
+    Scale,
+)
 
-song = beat & (Tune(None) * 3 + chords)
-song.play(beats_per_minute=120)
+# --- Load or synthesize sounds ---
+pluck = WavFile(Path("pluck.wav")).parse(Pitch(60))
+kick  = WavFile(Path("kick.wav")).parse(Pitch(60))
+hat   = WavFile(Path("hat.wav")).parse(Pitch(60))
+
+# --- Shape them with effects ---
+warm_pluck = pluck @ LowPass(1800) @ Decay(timedelta(milliseconds=900)) @ Gain(0.5)
+hard_hat   = hat @ Gain(0.3)
+
+# --- Tune to a key ---
+key = Key(KeyRoot.C, Scale.MAJOR, Quality.TRIAD)
+melody = Tune(
+    warm_pluck @ key @ Degree.I,
+    warm_pluck @ key @ Degree.IV,
+    warm_pluck @ key @ Degree.V,
+    warm_pluck @ key @ Degree.I,
+)
+
+# --- Arrange ---
+beat = Tune(hard_hat, REST, hard_hat, REST) * 4
+bass = Tune(kick, REST, kick, REST) * 4
+
+song = melody & beat & bass
+
+# --- Render ---
+song.compile(beats_per_minute=120).play()          # play live
+WavFile(Path("out.wav")).save(song.compile(beats_per_minute=120))  # or save
 ```
+
+See `scripts/sounds.py` and `scripts/test.py` for full working examples.
+
+## Rules of thumb
+
+- **Slot = 1 beat.** Want it faster? Nest a `Tune`. Slower? Spread with `REST`. Global speed? bpm.
+- **Variations are data.** Write them: `groove * 3 + fill`.
+- **Quality falls out of Key × degree.** Never name a chord's quality — it emerges.
+- **Transpose a layer:** change one `Key` constant. Drums don't move.
+- **`@` chains left-to-right:** `sound @ key @ Degree.I`, then add effects.
+
+## Project layout
+
+```
+src/songtools/
+  types.py      # Buffer, Pitch, KeyRoot, Scale, Quality, Degree, effects
+  sounds.py     # Sound, KeyedSound, REST
+  keys.py       # Key (harmonic context)
+  tunes.py      # Tune (sequential time)
+  layers.py     # Layer (parallel time)
+  transports.py # mixdown — the bpm-aware renderer
+  files.py      # WavFile — load/save 16-bit mono WAV
+scripts/
+  sounds.py     # Synthesize pluck, kick, snare, hat
+  test.py       # Full song example
+```
+
+## License
+
+MIT
