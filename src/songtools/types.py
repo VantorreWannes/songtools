@@ -63,6 +63,15 @@ class Degree(IntEnum):
     VI = 5
     VII = 6
 
+    def _wrap(self, steps: int) -> Degree:
+        return Degree((self + steps) % len(type(self)))
+
+    def up(self, steps: int) -> Degree:
+        return self._wrap(steps)
+
+    def down(self, steps: int) -> Degree:
+        return self._wrap(-steps)
+
 
 Chord = Degree
 
@@ -146,6 +155,45 @@ class Gate:
 
     def apply(self, buffer: Buffer) -> Buffer:
         return buffer[: int(self.seconds * SAMPLE_RATE)]
+
+
+@dataclass(frozen=True, slots=True)
+class Reverse:
+    def apply(self, buffer: Buffer) -> Buffer:
+        return Buffer("f", reversed(buffer))
+
+
+@dataclass(frozen=True, slots=True)
+class Echo:
+
+    seconds: float
+
+    def apply(self, buffer: Buffer) -> Buffer:
+        delay = int(self.seconds * SAMPLE_RATE)
+        output = SILENCE * (len(buffer) + delay)
+        output[: len(buffer)] = buffer
+        for index, sample in enumerate(buffer):
+            output[delay + index] += sample / 2
+        return output
+
+
+@dataclass(frozen=True, slots=True)
+class Drive:
+    amount: float
+
+    def apply(self, buffer: Buffer) -> Buffer:
+        norm = math.tanh(self.amount)
+        return Buffer("f", (math.tanh(s * self.amount) / norm for s in buffer))
+
+
+@dataclass(frozen=True, slots=True)
+class Humanize:
+
+    velocity: float
+
+    def apply(self, buffer: Buffer) -> Buffer:
+        gain = 1.0 + self.velocity * math.tanh(math.sin(sum(buffer)))
+        return Buffer("f", (s * gain for s in buffer))
 
 
 class Instrument(SimpleNamespace): ...

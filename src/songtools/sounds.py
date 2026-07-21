@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import overload
 
 from songtools.keys import Key
-from songtools.types import Buffer, Chord, Effect, Mix
+from songtools.types import SILENCE, Buffer, Chord, Effect, Mix
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,7 +48,6 @@ class KeyedSound(Sound):
         return KeyedSound(mix.apply(root), self.key)
 
     def __matmul__(self, other: Effect | Key | Chord) -> KeyedSound:
-        """Apply the specified `Effect` to this sound."""
         if isinstance(other, Key):
             return self.as_key(other)
         if isinstance(other, Effect):
@@ -56,3 +55,11 @@ class KeyedSound(Sound):
         if isinstance(other, Chord):
             return self.as_chord(other)
         raise TypeError(type(other))
+
+
+class Rest(Sound):
+    def __init__(self) -> None:
+        super().__init__(SILENCE)
+
+
+REST = Rest()
