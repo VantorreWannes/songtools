@@ -128,6 +128,10 @@ class ReSample:
     rate: float
 
     def apply(self, buffer: Buffer) -> Buffer:
+        if self.rate > 1:
+            lowpass = LowPass(SAMPLE_RATE / (2 * self.rate))
+            for _ in range(4):
+                buffer = lowpass.apply(buffer)
         length = max(1, int(len(buffer) / self.rate))
         last = len(buffer) - 1
         output = SILENCE * length

@@ -45,12 +45,7 @@ class Layer:
         return Layer(self.tunes + other.tunes, self.shift + other.shift)
 
     def __mul__(self, amount: int) -> Layer:
-        repeated = tuple(
-            tune.shifted(rep * self.beats)
-            for rep in range(amount)
-            for tune in self.tunes
-        )
-        return Layer(repeated, self.shift)
+        return Layer(tuple(tune * amount for tune in self.tunes), self.shift)
 
     def __and__(self, other: Tune | Layer) -> Layer:
         if isinstance(other, Layer):

@@ -11,7 +11,7 @@ from songtools.types import SAMPLE_RATE, SILENCE, Buffer, Chord, Effect, Mix, Pi
 @dataclass(frozen=True, slots=True)
 class Sound:
     buffer: Buffer
-    tuned_at: Pitch  # note the buffer was recorded at
+    tuned_at: Pitch
 
     def with_effect(self, effect: Effect) -> Sound:
         return Sound(effect.apply(self.buffer), self.tuned_at)
@@ -67,7 +67,6 @@ class KeyedSound(Sound):
         return KeyedSound(effect.apply(self.buffer), self.tuned_at, self.key)
 
     def as_key(self, key: Key) -> KeyedSound:
-        """Retune this sound to the root note of the given key."""
         shift = key.root - self.key.root
         return KeyedSound(Pitch(60 + shift).apply(self.buffer), key.note(0), key)
 
