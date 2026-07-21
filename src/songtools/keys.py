@@ -21,4 +21,10 @@ class Key:
         return Pitch(self._midi(degree))
 
     def notes(self, chord: Chord | int) -> tuple[Pitch, ...]:
-        return tuple(Pitch(self._midi(chord + step)) for step in self.quality.value)
+        return tuple(self.note(chord + step) for step in self.quality.value)
+
+    def steps(self, chord: Chord | int) -> tuple[Pitch, ...]:
+        """Chord pitches relative to this key's root (for pre-tuned buffers)."""
+        return tuple(
+            Pitch(self._midi(chord + step) - self.root) for step in self.quality.value
+        )

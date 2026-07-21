@@ -2,7 +2,6 @@ import math
 from array import array
 from dataclasses import dataclass
 from enum import Enum, IntEnum
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
@@ -165,7 +164,6 @@ class Reverse:
 
 @dataclass(frozen=True, slots=True)
 class Echo:
-
     seconds: float
 
     def apply(self, buffer: Buffer) -> Buffer:
@@ -188,12 +186,8 @@ class Drive:
 
 @dataclass(frozen=True, slots=True)
 class Humanize:
-
     velocity: float
 
     def apply(self, buffer: Buffer) -> Buffer:
         gain = 1.0 + self.velocity * math.tanh(math.sin(sum(buffer)))
         return Buffer("f", (s * gain for s in buffer))
-
-
-class Instrument(SimpleNamespace): ...

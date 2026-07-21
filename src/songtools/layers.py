@@ -2,11 +2,11 @@ import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from songtools.transports import export, play
+from songtools.sounds import Sound
+from songtools.transports import mixdown
+from songtools.types import Pitch
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from songtools.tunes import Tune
     from songtools.types import Effect, Event
 
@@ -23,31 +23,28 @@ class Layer:
     def shifted(self, beats: float) -> Layer:
         return Layer(self.tunes, self.shift + beats)
 
-    def compile(self) -> list[Event]:
+    def events(self, span: float) -> list[Event]:
+        scale = span / self.beats
         events = [
-            event.shifted(loop * tune.beats + self.shift)
+            event.shifted((loop * tune.beats + self.shift) * scale)
             for tune in self.tunes
             for loop in range(self.beats // tune.beats)
-            for event in tune.compile()
+            for event in tune.events(scale * tune.beats)
         ]
         return sorted(events, key=lambda event: event.beat)
 
-    def play(self, beats_per_minute: float) -> None:
-        play(self, beats_per_minute)
-
-    def export(self, path: Path, bpm: float) -> None:
-        export(self, bpm, path)
+    def compile(self, beats_per_minute: float) -> Sound:
+        buffer = mixdown(self.events(float(self.beats)), self.beats, beats_per_minute)
+        return Sound(buffer, Pitch(60))
 
     def with_effect(self, effect: Effect) -> Layer:
         tunes = tuple(tune.with_effect(effect) for tune in self.tunes)
         return Layer(tunes, self.shift)
 
     def __add__(self, other: Layer) -> Layer:
-        """Concatenate two layers together using the + operator."""
         return Layer(self.tunes + other.tunes, self.shift + other.shift)
 
     def __mul__(self, amount: int) -> Layer:
-        """Repeat a layer `n` times, end to end."""
         repeated = tuple(
             tune.shifted(rep * self.beats)
             for rep in range(amount)
@@ -56,11 +53,9 @@ class Layer:
         return Layer(repeated, self.shift)
 
     def __and__(self, other: Tune | Layer) -> Layer:
-        """Combine two layers together using the & operator."""
         if isinstance(other, Layer):
             return Layer(self.tunes + other.tunes, self.shift + other.shift)
         return Layer((*self.tunes, other), self.shift)
 
     def __matmul__(self, other: Effect) -> Layer:
-        """Apply the specified `Effect` to this layer."""
         return self.with_effect(other)

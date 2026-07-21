@@ -4,15 +4,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from songtools.layers import Layer
-from songtools.sounds import REST
-from songtools.transports import export as _export
-from songtools.transports import play
-from songtools.types import Event
+from songtools.sounds import REST, Sound
+from songtools.transports import mixdown
+from songtools.types import Event, Pitch
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
-    from songtools.sounds import Sound
     from songtools.types import Effect
 
 
@@ -40,17 +36,12 @@ class Tune:
                 events.append(Event(offset, slot))
         return events
 
-    def compile(self) -> list[Event]:
-        return self.events(float(self.beats))
+    def compile(self, beats_per_minute: float) -> Sound:
+        buffer = mixdown(self.events(float(self.beats)), self.beats, beats_per_minute)
+        return Sound(buffer, Pitch(60))
 
     def shifted(self, beats: float) -> Layer:
         return Layer((self,), beats)
-
-    def play(self, bpm: float) -> None:
-        play(self, bpm)
-
-    def export(self, path: Path, bpm: float) -> None:
-        _export(self, bpm, path)
 
     def with_effect(self, effect: Effect) -> Tune:
         return Tune(tuple(slot.with_effect(effect) for slot in self.sounds))
