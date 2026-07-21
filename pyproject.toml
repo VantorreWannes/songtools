@@ -7,8 +7,26 @@ authors = [
     { name = "Wannes Vantorre", email = "vantorrewannes@gmail.com" }
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "sounddevice>=0.5.5",
+]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["D203", "D213", "COM812", "ISC001", "D100",  "D101", "D102", "D103", "D104", "S311", "D419"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+"tests/unit/**" = ["SLF001"]
+"scripts/**" = ["T201"]
 
 [build-system]
 requires = ["uv_build>=0.11.30,<0.12.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.15.22",
+    "ty>=0.0.61",
+]
