@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import math
+from abc import ABC, abstractmethod
 from array import array
 from dataclasses import dataclass
+from functools import cache
 from typing import overload
 
 import sounddevice
@@ -21,15 +23,20 @@ from songtools.types import (
 )
 
 
-class Composition:
+class Composition(ABC):
     @property
+    @abstractmethod
     def beats(self) -> float:
         raise NotImplementedError
 
+    @abstractmethod
     def events(self, span: float) -> list[Event]:
+        _ = span
         raise NotImplementedError
 
+    @abstractmethod
     def with_effect(self, effect: Effect) -> Composition:
+        _ = effect
         raise NotImplementedError
 
     def compile(self, beats_per_minute: float) -> Sound:
@@ -75,7 +82,7 @@ class Sound(Composition):
         return [Event(0.0, self)]
 
     def with_effect(self, effect: Effect) -> Sound:
-        return Sound(effect.apply(self.buffer), self.tuned_at)
+        return _effected(self, effect)
 
     def play(self) -> None:
         pcm = array("f", (max(-1.0, min(1.0, s)) for s in self.buffer)).tobytes()
@@ -96,8 +103,7 @@ class Sound(Composition):
             sounddevice.sleep(int(len(self.buffer) / SAMPLE_RATE * 1000) + 200)
 
     def as_key(self, key: Key) -> KeyedSound:
-        shift = 60 + key.root - self.tuned_at.midi
-        return KeyedSound(Pitch(60 + shift).apply(self.buffer), key.note(0), key)
+        return _keyed(self, key)
 
     @overload
     def __matmul__(self, other: Key) -> KeyedSound: ...
@@ -120,16 +126,13 @@ class KeyedSound(Sound):
     key: Key
 
     def with_effect(self, effect: Effect) -> KeyedSound:
-        return KeyedSound(effect.apply(self.buffer), self.tuned_at, self.key)
+        return _effected_keyed(self, effect)
 
     def as_key(self, key: Key) -> KeyedSound:
-        shift = key.root - self.key.root
-        return KeyedSound(Pitch(60 + shift).apply(self.buffer), key.note(0), key)
+        return _rekeyed(self, key)
 
     def as_chord(self, chord: Chord) -> KeyedSound:
-        root, *harmony = (pitch.apply(self.buffer) for pitch in self.key.steps(chord))
-        mix = Mix(*harmony)
-        return KeyedSound(mix.apply(root), self.tuned_at, self.key)
+        return _chorded(self, chord)
 
     def __matmul__(self, other: Effect | Key | Chord) -> KeyedSound:
         if isinstance(other, Key):
@@ -164,7 +167,7 @@ class Shifted(Composition):
 
     def events(self, span: float) -> list[Event]:
         scale = span / self.beats
-        return [event.shifted(self.shift * scale) for event in self.item.events(span)]
+        return _shifted_events(self.item, self.shift * scale, span)
 
     def with_effect(self, effect: Effect) -> Shifted:
         return Shifted(self.item.with_effect(effect), self.shift)
@@ -226,5 +229,50 @@ class Tune(Composition):
         ]
         return Tune(*stretched)
 
+    def stretched(self, beats: int) -> Tune:
+        stretched = [
+            slot for sound in self.sounds for slot in (*((REST,) * (beats - 1)), sound)
+        ]
+        return Tune(*stretched)
+
     def with_effect(self, effect: Effect) -> Tune:
         return Tune(*(slot.with_effect(effect) for slot in self.sounds))
+
+
+@cache
+def _effected(sound: Sound, effect: Effect) -> Sound:
+    return Sound(effect.apply(sound.buffer), sound.tuned_at)
+
+
+@cache
+def _effected_keyed(sound: KeyedSound, effect: Effect) -> KeyedSound:
+    return KeyedSound(effect.apply(sound.buffer), sound.tuned_at, sound.key)
+
+
+@cache
+def _keyed(sound: Sound, key: Key) -> KeyedSound:
+    shift = 60 + key.root - sound.tuned_at.midi
+    buffer = _pitched(Pitch(60 + shift), sound.buffer)
+    return KeyedSound(buffer, key.note(0), key)
+
+
+@cache
+def _rekeyed(sound: KeyedSound, key: Key) -> KeyedSound:
+    shift = key.root - sound.key.root
+    buffer = _pitched(Pitch(60 + shift), sound.buffer)
+    return KeyedSound(buffer, key.note(0), key)
+
+
+@cache
+def _chorded(sound: KeyedSound, chord: Chord) -> KeyedSound:
+    root, *harmony = (_pitched(pitch, sound.buffer) for pitch in sound.key.steps(chord))
+    return KeyedSound(Mix(*harmony).apply(root), sound.tuned_at, sound.key)
+
+
+@cache
+def _pitched(pitch: Pitch, buffer: Buffer) -> Buffer:
+    return pitch.apply(buffer)
+
+
+def _shifted_events(item: Composition, shift: float, span: float) -> list[Event]:
+    return [event.shifted(shift) for event in item.events(span)]

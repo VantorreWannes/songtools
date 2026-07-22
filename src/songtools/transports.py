@@ -1,8 +1,6 @@
-"""The transport: owns absolute time (bpm)."""
-
 import math
 
-from songtools.types import SAMPLE_RATE, SILENCE, Buffer, Event
+from songtools.types import SAMPLE_RATE, SILENCE, Buffer, Event, make_buffer
 
 
 def mixdown(events: list[Event], beats: int, beats_per_minute: float) -> Buffer:
@@ -10,7 +8,13 @@ def mixdown(events: list[Event], beats: int, beats_per_minute: float) -> Buffer:
     mix = SILENCE * (int(beats * frames_per_beat) + SAMPLE_RATE)
     for event in events:
         start = int(event.beat * frames_per_beat)
-        for index, sample in enumerate(event.sound.buffer):
-            if (position := start + index) < len(mix):
-                mix[position] += sample
-    return Buffer("f", (math.tanh(s) for s in (x * 0.7 for x in mix)))
+        end = min(start + len(event.sound.buffer), len(mix))
+        if end <= start:
+            continue
+        mix[start:end] = make_buffer(
+            a + b
+            for a, b in zip(
+                mix[start:end], event.sound.buffer[: end - start], strict=True
+            )
+        )
+    return make_buffer(math.tanh(x * 0.7) for x in mix)

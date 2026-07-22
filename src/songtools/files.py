@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 from songtools.compositions import Sound
-from songtools.types import SAMPLE_RATE, Buffer, Pitch
+from songtools.types import SAMPLE_RATE, Pitch, make_buffer
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -45,7 +45,7 @@ class WavFile:
                 for i in range(0, len(samples), channel_count)
             ]
 
-        return Sound(Buffer("f", (s / max_val for s in samples)), pitch)
+        return Sound(make_buffer(s / max_val for s in samples), pitch)
 
     def save(self, sound: Sound) -> None:
         pcm16 = array(

@@ -2,15 +2,37 @@ import math
 from array import array
 from dataclasses import dataclass
 from enum import Enum, IntEnum
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from datetime import timedelta
 
     from songtools.compositions import Sound
 
-Buffer = array[float]
-SILENCE = Buffer("f", [0.0])
+
+class Buffer(array[float]):
+    def __hash__(self) -> int:
+        return hash((len(self), self.tobytes()))
+
+    def __mul__(self, n: int) -> Buffer:
+        result = super().__mul__(n)
+        return Buffer(result.typecode, list(result))
+
+    __rmul__ = __mul__
+
+
+def as_buffer(samples: array[float]) -> Buffer:
+    if isinstance(samples, Buffer):
+        return samples
+    return Buffer(samples.typecode, list(samples))
+
+
+def make_buffer(samples: Iterable[float]) -> Buffer:
+    return cast("Buffer", Buffer("f", list(samples)))
+
+
+SILENCE = make_buffer([0.0])
 SAMPLE_RATE = 48000
 
 
@@ -85,7 +107,10 @@ class Gain:
     amount: float
 
     def apply(self, buffer: Buffer) -> Buffer:
-        return Buffer("f", (s * self.amount for s in buffer))
+        if self.amount == 1.0:
+            return buffer
+        amount = self.amount
+        return make_buffer(s * amount for s in buffer)
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,7 +119,13 @@ class Decay:
 
     def apply(self, buffer: Buffer) -> Buffer:
         constant = 1.0 / (self.duration.total_seconds() * SAMPLE_RATE)
-        return Buffer("f", (s * math.exp(-i * constant) for i, s in enumerate(buffer)))
+        decay = math.exp(-constant)
+        gain = 1.0
+        output = Buffer("f", bytes(len(buffer) * 4))
+        for i, s in enumerate(buffer):
+            output[i] = s * gain
+            gain *= decay
+        return make_buffer(output)
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,12 +134,13 @@ class LowPass:
 
     def apply(self, buffer: Buffer) -> Buffer:
         alpha = 1.0 - math.exp(-math.tau * self.hertz / SAMPLE_RATE)
+        beta = 1.0 - alpha
         state = 0.0
-        output = SILENCE * len(buffer)
+        output = Buffer("f", bytes(len(buffer) * 4))
         for index, sample in enumerate(buffer):
-            state += alpha * (sample - state)
+            state = alpha * sample + beta * state
             output[index] = state
-        return output
+        return make_buffer(output)
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,9 +155,10 @@ class Mix:
     def apply(self, buffer: Buffer) -> Buffer:
         buffers = (buffer, *self.buffers)
         length = min(len(b) for b in buffers)
-        return Buffer(
-            "f", (sum(b[i] for b in buffers) / len(buffers) for i in range(length))
-        )
+        inv = 1.0 / len(buffers)
+        buffers = tuple(as_buffer(b) for b in buffers)
+        views = [memoryview(b)[:length] for b in buffers]
+        return make_buffer(math.fsum(vals) * inv for vals in zip(*views, strict=True))
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,19 +166,23 @@ class ReSample:
     rate: float
 
     def apply(self, buffer: Buffer) -> Buffer:
+        buffer = as_buffer(buffer)
         if self.rate > 1:
             lowpass = LowPass(SAMPLE_RATE / (2 * self.rate))
             for _ in range(4):
                 buffer = lowpass.apply(buffer)
         length = max(1, int(len(buffer) / self.rate))
         last = len(buffer) - 1
-        output = SILENCE * length
+        rate = self.rate
+        output = Buffer("f", bytes(length * 4))
+        pos = 0.0
         for i in range(length):
-            pos = i * self.rate
             j = int(pos)
-            if j < last:
-                output[i] = buffer[j] + (buffer[j + 1] - buffer[j]) * (pos - j)
-        return output
+            if j >= last:
+                break
+            output[i] = buffer[j] + (buffer[j + 1] - buffer[j]) * (pos - j)
+            pos += rate
+        return make_buffer(output)
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,13 +199,13 @@ class Gate:
     seconds: float
 
     def apply(self, buffer: Buffer) -> Buffer:
-        return buffer[: int(self.seconds * SAMPLE_RATE)]
+        return as_buffer(buffer[: int(self.seconds * SAMPLE_RATE)])
 
 
 @dataclass(frozen=True, slots=True)
 class Reverse:
     def apply(self, buffer: Buffer) -> Buffer:
-        return Buffer("f", reversed(buffer))
+        return make_buffer(reversed(buffer))
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,9 +216,12 @@ class Echo:
         delay = int(self.seconds * SAMPLE_RATE)
         output = SILENCE * (len(buffer) + delay)
         output[: len(buffer)] = buffer
-        for index, sample in enumerate(buffer):
-            output[delay + index] += sample / 2
-        return output
+        tail = make_buffer(s / 2 for s in buffer)
+        echoed = output[delay : delay + len(buffer)]
+        output[delay : delay + len(buffer)] = make_buffer(
+            a + b for a, b in zip(echoed, tail, strict=True)
+        )
+        return make_buffer(output)
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,7 +230,7 @@ class Drive:
 
     def apply(self, buffer: Buffer) -> Buffer:
         norm = math.tanh(self.amount)
-        return Buffer("f", (math.tanh(s * self.amount) / norm for s in buffer))
+        return make_buffer(math.tanh(s * self.amount) / norm for s in buffer)
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,5 +238,5 @@ class Humanize:
     velocity: float
 
     def apply(self, buffer: Buffer) -> Buffer:
-        gain = 1.0 + self.velocity * math.tanh(math.sin(sum(buffer)))
-        return Buffer("f", (s * gain for s in buffer))
+        gain = 1.0 + self.velocity * math.tanh(math.sin(math.fsum(buffer)))
+        return make_buffer(s * gain for s in buffer)
