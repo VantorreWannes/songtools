@@ -1,5 +1,4 @@
 import math
-import time
 from array import array
 from dataclasses import dataclass
 from enum import Enum, IntEnum
@@ -51,16 +50,16 @@ class Event:
 
 class KeyRoot(IntEnum):
     C = 0
-    Cs = 1
+    CS = 1
     D = 2
-    Ds = 3
+    DS = 3
     E = 4
     F = 5
-    Fs = 6
+    FS = 6
     G = 7
-    Gs = 8
+    GS = 8
     A = 9
-    As = 10
+    AS = 10
     B = 11
 
 
@@ -121,13 +120,13 @@ class Gain:
 
 @dataclass(frozen=True, slots=True)
 class Decay:
-    duration: timedelta
+    after: timedelta
 
     def __repr__(self) -> str:
-        return f"Decay({self.duration!r})"
+        return f"Decay({self.after.total_seconds()!r})"
 
     def apply(self, buffer: Buffer) -> Buffer:
-        constant = 1.0 / (self.duration.total_seconds() * SAMPLE_RATE)
+        constant = 1.0 / (self.after.total_seconds() * SAMPLE_RATE)
         decay = math.exp(-constant)
         gain = 1.0
         output = Buffer("f", bytes(len(buffer) * 4))
