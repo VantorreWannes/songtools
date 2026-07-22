@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from datetime import timedelta
 
-    from songtools.sounds import Sound
+    from songtools.compositions import Sound
 
 Buffer = array[float]
 SILENCE = Buffer("f", [0.0])
@@ -114,6 +114,11 @@ class LowPass:
 @dataclass(frozen=True, slots=True)
 class Mix:
     buffers: tuple[Buffer, ...]
+
+    def __init__(self, *buffers: Buffer) -> None:
+        if len(buffers) == 1 and isinstance(buffers[0], tuple):
+            buffers = buffers[0]
+        object.__setattr__(self, "buffers", buffers)
 
     def apply(self, buffer: Buffer) -> Buffer:
         buffers = (buffer, *self.buffers)

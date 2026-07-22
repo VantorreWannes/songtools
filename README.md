@@ -26,13 +26,13 @@ Requires Python 3.14+ and [sounddevice](https://python-sounddevice.readthedocs.i
 
 ## Operators
 
-| Op              | Meaning                                      |
-| --------------- | -------------------------------------------- |
-| `Tune(a, b, c)` | Slots of 1 beat; nesting subdivides          |
-| `a + b`         | a, then b (sequence)                         |
-| `a * n`         | repeat                                       |
-| `a & b`         | together — shorter side loops to LCM         |
-| `x @ y`         | realize: left plays right, in left's context |
+| Op               | Meaning                                      |
+| ---------------- | -------------------------------------------- |
+| `Tune(a, b, c)`  | Slots of 1 beat; nesting subdivides          |
+| `Layer(a, b, c)` | Parallel voices; shorter sides loop to LCM   |
+| `a + b`          | a, then b (sequence)                         |
+| `a * n`          | repeat                                       |
+| `x @ y`          | realize: left plays right, in left's context |
 
 `None` is not used — use `REST` for a rest inside a `Tune`.
 
@@ -73,6 +73,7 @@ from datetime import timedelta
 
 from songtools.files import WavFile
 from songtools.keys import Key
+from songtools.layers import Layer
 from songtools.sounds import REST, Sound
 from songtools.tunes import Tune
 from songtools.types import (
@@ -109,7 +110,7 @@ melody = Tune(
 beat = Tune(hard_hat, REST, hard_hat, REST) * 4
 bass = Tune(kick, REST, kick, REST) * 4
 
-song = melody & beat & bass
+song = Layer(melody, beat, bass)
 
 # --- Render ---
 song.compile(beats_per_minute=120).play()          # play live

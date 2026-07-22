@@ -4,7 +4,7 @@ from array import array
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from songtools.sounds import Sound
+from songtools.compositions import Sound
 from songtools.types import SAMPLE_RATE, Buffer, Pitch
 
 if TYPE_CHECKING:
