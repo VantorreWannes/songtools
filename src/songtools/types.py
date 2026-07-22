@@ -239,3 +239,116 @@ class Humanize:
     def apply(self, buffer: Buffer) -> Buffer:
         gain = 1.0 + self.velocity * math.tanh(math.sin(math.fsum(buffer)))
         return make_buffer(s * gain for s in buffer)
+
+
+@dataclass(frozen=True, slots=True)
+class HighPass:
+    hertz: float
+
+    def apply(self, buffer: Buffer) -> Buffer:
+        rc = 1.0 / (math.tau * self.hertz)
+        alpha = rc / (rc + 1.0 / SAMPLE_RATE)
+        state = 0.0
+        previous = 0.0
+        output = Buffer("f", bytes(len(buffer) * 4))
+        for index, sample in enumerate(buffer):
+            state = alpha * (state + sample - previous)
+            previous = sample
+            output[index] = state
+        return make_buffer(output)
+
+
+@dataclass(frozen=True, slots=True)
+class FadeIn:
+    seconds: float
+
+    def apply(self, buffer: Buffer) -> Buffer:
+        length = min(len(buffer), int(self.seconds * SAMPLE_RATE))
+        if length <= 0:
+            return buffer
+        output = as_buffer(buffer[:])
+        for i in range(length):
+            output[i] *= i / length
+        return output
+
+
+@dataclass(frozen=True, slots=True)
+class FadeOut:
+    seconds: float
+
+    def apply(self, buffer: Buffer) -> Buffer:
+        length = min(len(buffer), int(self.seconds * SAMPLE_RATE))
+        if length <= 0:
+            return buffer
+        output = as_buffer(buffer[:])
+        end = len(buffer)
+        for i in range(length):
+            output[end - length + i] *= 1.0 - i / length
+        return output
+
+
+@dataclass(frozen=True, slots=True)
+class Delay:
+    seconds: float
+    feedback: float
+    mix: float
+
+    def apply(self, buffer: Buffer) -> Buffer:
+        delay = int(self.seconds * SAMPLE_RATE)
+        if delay <= 0:
+            return buffer
+        feedback = max(0.0, min(self.feedback, 0.95))
+        mix = max(0.0, min(self.mix, 1.0))
+        length = len(buffer) + delay
+        wet = SILENCE * length
+        wet[: len(buffer)] = buffer
+        for i in range(delay, length):
+            wet[i] += wet[i - delay] * feedback
+        return make_buffer(
+            (1.0 - mix) * (buffer[i] if i < len(buffer) else 0.0) + mix * wet[i]
+            for i in range(length)
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class Normalize:
+    peak: float
+
+    def apply(self, buffer: Buffer) -> Buffer:
+        loudest = max((abs(s) for s in buffer), default=0.0)
+        if loudest == 0.0:
+            return buffer
+        gain = self.peak / loudest
+        return make_buffer(s * gain for s in buffer)
+
+
+@dataclass(frozen=True, slots=True)
+class Clip:
+    threshold: float
+
+    def apply(self, buffer: Buffer) -> Buffer:
+        limit = abs(self.threshold)
+        return make_buffer(max(-limit, min(limit, s)) for s in buffer)
+
+
+@dataclass(frozen=True, slots=True)
+class Tremolo:
+    hertz: float
+    depth: float
+
+    def apply(self, buffer: Buffer) -> Buffer:
+        depth = max(0.0, min(self.depth, 1.0))
+        step = math.tau * self.hertz / SAMPLE_RATE
+        return make_buffer(
+            s * (1.0 - depth * (0.5 + 0.5 * math.sin(i * step)))
+            for i, s in enumerate(buffer)
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class BitCrush:
+    bits: int
+
+    def apply(self, buffer: Buffer) -> Buffer:
+        steps = (1 << max(1, min(self.bits, 24))) - 1
+        return make_buffer(round(s * steps) / steps for s in buffer)
