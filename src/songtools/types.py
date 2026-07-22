@@ -84,14 +84,13 @@ class Degree(IntEnum):
     VI = 5
     VII = 6
 
-    def _wrap(self, steps: int) -> Degree:
-        return Degree((self + steps) % len(type(self)))
+    def up(self, steps: int) -> int:
+        """Scale steps up. May exceed the octave; Key resolves via divmod."""
+        return int(self) + steps
 
-    def up(self, steps: int) -> Degree:
-        return self._wrap(steps)
-
-    def down(self, steps: int) -> Degree:
-        return self._wrap(-steps)
+    def down(self, steps: int) -> int:
+        """Scale steps down. Negative values resolve to lower octaves."""
+        return int(self) - steps
 
 
 Chord = Degree

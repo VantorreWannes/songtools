@@ -131,15 +131,15 @@ class KeyedSound(Sound):
     def as_key(self, key: Key) -> KeyedSound:
         return _rekeyed(self, key)
 
-    def as_chord(self, chord: Chord) -> KeyedSound:
+    def as_chord(self, chord: Chord | int) -> KeyedSound:
         return _chorded(self, chord)
 
-    def __matmul__(self, other: Effect | Key | Chord) -> KeyedSound:
+    def __matmul__(self, other: Effect | Key | Chord | int) -> KeyedSound:
         if isinstance(other, Key):
             return self.as_key(other)
         if isinstance(other, Effect):
             return self.with_effect(other)
-        if isinstance(other, Chord):
+        if isinstance(other, int):
             return self.as_chord(other)
         raise TypeError(type(other))
 
@@ -264,7 +264,7 @@ def _rekeyed(sound: KeyedSound, key: Key) -> KeyedSound:
 
 
 @cache
-def _chorded(sound: KeyedSound, chord: Chord) -> KeyedSound:
+def _chorded(sound: KeyedSound, chord: Chord | int) -> KeyedSound:
     root, *harmony = (_pitched(pitch, sound.buffer) for pitch in sound.key.steps(chord))
     return KeyedSound(Mix(*harmony).apply(root), sound.tuned_at, sound.key)
 
