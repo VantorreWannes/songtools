@@ -1,4 +1,5 @@
 import math
+import time
 from array import array
 from dataclasses import dataclass
 from enum import Enum, IntEnum
@@ -106,15 +107,15 @@ class Effect(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class Gain:
-    amount: float
+    amount: timedelta
 
     def __repr__(self) -> str:
-        return f"Gain({self.amount!r})"
+        return f"Gain({self.amount.total_seconds()!r})"
 
     def apply(self, buffer: Buffer) -> Buffer:
-        if self.amount == 1.0:
+        if self.amount.total_seconds() == 1.0:
             return buffer
-        amount = self.amount
+        amount = self.amount.total_seconds()
         return make_buffer(s * amount for s in buffer)
 
 
@@ -299,13 +300,13 @@ class HighPass:
 
 @dataclass(frozen=True, slots=True)
 class FadeIn:
-    seconds: float
+    after: timedelta
 
     def __repr__(self) -> str:
-        return f"FadeIn({self.seconds!r})"
+        return f"FadeIn({self.after.total_seconds()!r})"
 
     def apply(self, buffer: Buffer) -> Buffer:
-        length = min(len(buffer), int(self.seconds * SAMPLE_RATE))
+        length = min(len(buffer), int(self.after.total_seconds() * SAMPLE_RATE))
         if length <= 0:
             return buffer
         output = as_buffer(buffer[:])
@@ -316,13 +317,13 @@ class FadeIn:
 
 @dataclass(frozen=True, slots=True)
 class FadeOut:
-    seconds: float
+    after: timedelta
 
     def __repr__(self) -> str:
-        return f"FadeOut({self.seconds!r})"
+        return f"FadeOut({self.after.total_seconds()!r})"
 
     def apply(self, buffer: Buffer) -> Buffer:
-        length = min(len(buffer), int(self.seconds * SAMPLE_RATE))
+        length = min(len(buffer), int(self.after.total_seconds() * SAMPLE_RATE))
         if length <= 0:
             return buffer
         output = as_buffer(buffer[:])
