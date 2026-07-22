@@ -5,7 +5,7 @@ A Python DSL for composing music from code. Notes carry expression, structure ca
 ## Install
 
 ```bash
-uv pip install -e .
+uv add songtools
 ```
 
 Requires Python 3.14+ and [sounddevice](https://python-sounddevice.readthedocs.io/) (PortAudio backend).

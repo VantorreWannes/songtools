@@ -13,6 +13,9 @@ class Key:
     scale: Scale
     quality: Quality
 
+    def __repr__(self) -> str:
+        return f"Key({self.root!r}, {self.scale!r}, {self.quality!r})"
+
     def _midi(self, degree: int) -> int:
         octv, idx = divmod(degree, len(self.scale.value))
         return 60 + self.root + self.scale.value[idx] + 12 * octv

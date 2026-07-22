@@ -21,6 +21,9 @@ class SoundFile(Protocol):
 class WavFile:
     path: Path
 
+    def __repr__(self) -> str:
+        return f"WavFile({self.path!r})"
+
     @classmethod
     def _unpack(cls, raw: bytes, channel_bytes: int) -> tuple[int, ...]:
         padded = b"".join(

@@ -15,6 +15,9 @@ class Buffer(array[float]):
     def __hash__(self) -> int:
         return hash((len(self), self.tobytes()))
 
+    def __repr__(self) -> str:
+        return f"Buffer(typecode={self.typecode!r}, len={len(self)})"
+
     def __mul__(self, n: int) -> Buffer:
         result = super().__mul__(n)
         return Buffer(result.typecode, list(result))
@@ -40,6 +43,9 @@ SAMPLE_RATE = 48000
 class Event:
     beat: float
     sound: Sound
+
+    def __repr__(self) -> str:
+        return f"Event({self.beat!r}, {self.sound!r})"
 
 
 class KeyRoot(IntEnum):
@@ -102,6 +108,9 @@ class Effect(Protocol):
 class Gain:
     amount: float
 
+    def __repr__(self) -> str:
+        return f"Gain({self.amount!r})"
+
     def apply(self, buffer: Buffer) -> Buffer:
         if self.amount == 1.0:
             return buffer
@@ -112,6 +121,9 @@ class Gain:
 @dataclass(frozen=True, slots=True)
 class Decay:
     duration: timedelta
+
+    def __repr__(self) -> str:
+        return f"Decay({self.duration!r})"
 
     def apply(self, buffer: Buffer) -> Buffer:
         constant = 1.0 / (self.duration.total_seconds() * SAMPLE_RATE)
@@ -128,6 +140,9 @@ class Decay:
 class LowPass:
     hertz: float
 
+    def __repr__(self) -> str:
+        return f"LowPass({self.hertz!r})"
+
     def apply(self, buffer: Buffer) -> Buffer:
         alpha = 1.0 - math.exp(-math.tau * self.hertz / SAMPLE_RATE)
         beta = 1.0 - alpha
@@ -142,6 +157,9 @@ class LowPass:
 @dataclass(frozen=True, slots=True)
 class Mix:
     buffers: tuple[Buffer, ...]
+
+    def __repr__(self) -> str:
+        return f"Mix({', '.join(repr(b) for b in self.buffers)})"
 
     def __init__(self, *buffers: Buffer) -> None:
         if len(buffers) == 1 and isinstance(buffers[0], tuple):
@@ -160,6 +178,9 @@ class Mix:
 @dataclass(frozen=True, slots=True)
 class ReSample:
     rate: float
+
+    def __repr__(self) -> str:
+        return f"ReSample({self.rate!r})"
 
     def apply(self, buffer: Buffer) -> Buffer:
         buffer = as_buffer(buffer)
@@ -185,6 +206,9 @@ class ReSample:
 class Pitch:
     midi: float
 
+    def __repr__(self) -> str:
+        return f"Pitch({self.midi!r})"
+
     def apply(self, buffer: Buffer) -> Buffer:
         rate = 2 ** ((self.midi - 60) / 12)
         return ReSample(rate=rate).apply(buffer)
@@ -192,24 +216,33 @@ class Pitch:
 
 @dataclass(frozen=True, slots=True)
 class Gate:
-    seconds: float
+    cutoff: timedelta
+
+    def __repr__(self) -> str:
+        return f"Gate({self.cutoff!r})"
 
     def apply(self, buffer: Buffer) -> Buffer:
-        return as_buffer(buffer[: int(self.seconds * SAMPLE_RATE)])
+        return as_buffer(buffer[: int(self.cutoff.total_seconds() * SAMPLE_RATE)])
 
 
 @dataclass(frozen=True, slots=True)
 class Reverse:
+    def __repr__(self) -> str:
+        return "Reverse()"
+
     def apply(self, buffer: Buffer) -> Buffer:
         return make_buffer(reversed(buffer))
 
 
 @dataclass(frozen=True, slots=True)
 class Echo:
-    seconds: float
+    duration: timedelta
+
+    def __repr__(self) -> str:
+        return f"Echo({self.duration!r})"
 
     def apply(self, buffer: Buffer) -> Buffer:
-        delay = int(self.seconds * SAMPLE_RATE)
+        delay = int(self.duration.total_seconds() * SAMPLE_RATE)
         output = SILENCE * (len(buffer) + delay)
         output[: len(buffer)] = buffer
         tail = make_buffer(s / 2 for s in buffer)
@@ -224,6 +257,9 @@ class Echo:
 class Drive:
     amount: float
 
+    def __repr__(self) -> str:
+        return f"Drive({self.amount!r})"
+
     def apply(self, buffer: Buffer) -> Buffer:
         norm = math.tanh(self.amount)
         return make_buffer(math.tanh(s * self.amount) / norm for s in buffer)
@@ -233,6 +269,9 @@ class Drive:
 class Humanize:
     velocity: float
 
+    def __repr__(self) -> str:
+        return f"Humanize({self.velocity!r})"
+
     def apply(self, buffer: Buffer) -> Buffer:
         gain = 1.0 + self.velocity * math.tanh(math.sin(math.fsum(buffer)))
         return make_buffer(s * gain for s in buffer)
@@ -241,6 +280,9 @@ class Humanize:
 @dataclass(frozen=True, slots=True)
 class HighPass:
     hertz: float
+
+    def __repr__(self) -> str:
+        return f"HighPass({self.hertz!r})"
 
     def apply(self, buffer: Buffer) -> Buffer:
         rc = 1.0 / (math.tau * self.hertz)
@@ -259,6 +301,9 @@ class HighPass:
 class FadeIn:
     seconds: float
 
+    def __repr__(self) -> str:
+        return f"FadeIn({self.seconds!r})"
+
     def apply(self, buffer: Buffer) -> Buffer:
         length = min(len(buffer), int(self.seconds * SAMPLE_RATE))
         if length <= 0:
@@ -273,6 +318,9 @@ class FadeIn:
 class FadeOut:
     seconds: float
 
+    def __repr__(self) -> str:
+        return f"FadeOut({self.seconds!r})"
+
     def apply(self, buffer: Buffer) -> Buffer:
         length = min(len(buffer), int(self.seconds * SAMPLE_RATE))
         if length <= 0:
@@ -286,12 +334,15 @@ class FadeOut:
 
 @dataclass(frozen=True, slots=True)
 class Delay:
-    seconds: float
+    amount: timedelta
     feedback: float
     mix: float
 
+    def __repr__(self) -> str:
+        return f"Delay({self.amount!r}, {self.feedback!r}, {self.mix!r})"
+
     def apply(self, buffer: Buffer) -> Buffer:
-        delay = int(self.seconds * SAMPLE_RATE)
+        delay = int(self.amount.total_seconds() * SAMPLE_RATE)
         if delay <= 0:
             return buffer
         feedback = max(0.0, min(self.feedback, 0.95))
@@ -311,6 +362,9 @@ class Delay:
 class Normalize:
     peak: float
 
+    def __repr__(self) -> str:
+        return f"Normalize({self.peak!r})"
+
     def apply(self, buffer: Buffer) -> Buffer:
         loudest = max((abs(s) for s in buffer), default=0.0)
         if loudest == 0.0:
@@ -323,6 +377,9 @@ class Normalize:
 class Clip:
     threshold: float
 
+    def __repr__(self) -> str:
+        return f"Clip({self.threshold!r})"
+
     def apply(self, buffer: Buffer) -> Buffer:
         limit = abs(self.threshold)
         return make_buffer(max(-limit, min(limit, s)) for s in buffer)
@@ -332,6 +389,9 @@ class Clip:
 class Tremolo:
     hertz: float
     depth: float
+
+    def __repr__(self) -> str:
+        return f"Tremolo({self.hertz!r}, {self.depth!r})"
 
     def apply(self, buffer: Buffer) -> Buffer:
         depth = max(0.0, min(self.depth, 1.0))
@@ -345,6 +405,9 @@ class Tremolo:
 @dataclass(frozen=True, slots=True)
 class BitCrush:
     bits: int
+
+    def __repr__(self) -> str:
+        return f"BitCrush({self.bits!r})"
 
     def apply(self, buffer: Buffer) -> Buffer:
         steps = (1 << max(1, min(self.bits, 24))) - 1

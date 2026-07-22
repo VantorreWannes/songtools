@@ -39,6 +39,9 @@ class Composition(ABC):
         _ = effect
         raise NotImplementedError
 
+    def simplify(self) -> Composition:
+        return self
+
     def compile(self, beats_per_minute: float) -> Sound:
         buffer = mixdown(
             self.events(float(self.beats)), int(self.beats), beats_per_minute
@@ -72,6 +75,9 @@ class Composition(ABC):
 class Sound(Composition):
     buffer: Buffer
     tuned_at: Pitch
+
+    def __repr__(self) -> str:
+        return f"Sound({self.buffer!r}, {self.tuned_at!r})"
 
     @property
     def beats(self) -> float:
@@ -125,6 +131,9 @@ class Sound(Composition):
 class KeyedSound(Sound):
     key: Key
 
+    def __repr__(self) -> str:
+        return f"KeyedSound({self.buffer!r}, {self.tuned_at!r}, {self.key!r})"
+
     def with_effect(self, effect: Effect) -> KeyedSound:
         return _effected_keyed(self, effect)
 
@@ -161,6 +170,9 @@ class Shifted(Composition):
     item: Composition
     shift: float
 
+    def __repr__(self) -> str:
+        return f"Shifted({self.item!r}, {self.shift!r})"
+
     @property
     def beats(self) -> float:
         return self.item.beats
@@ -178,6 +190,14 @@ class Shifted(Composition):
     def __mul__(self, amount: int) -> Shifted:
         return Shifted(self.item * amount, self.shift)
 
+    def simplify(self) -> Composition:
+        item = self.item.simplify()
+        if isinstance(item, Shifted):
+            return Shifted(item.item, item.shift + self.shift).simplify()
+        if self.shift == 0:
+            return item
+        return Shifted(item, self.shift)
+
 
 @dataclass(slots=True)
 class Layer(Composition):
@@ -185,6 +205,9 @@ class Layer(Composition):
 
     def __init__(self, *tunes: Composition) -> None:
         self.tunes = tuple(tunes)
+
+    def __repr__(self) -> str:
+        return f"Layer({', '.join(repr(t) for t in self.tunes)})"
 
     @property
     def beats(self) -> float:
@@ -206,6 +229,18 @@ class Layer(Composition):
     def __mul__(self, amount: int) -> Layer:
         return Layer(*(tune * amount for tune in self.tunes))
 
+    def _simplify(self) -> Composition:
+        tunes = [t.simplify() for t in self.tunes]
+        flattened: list[Composition] = []
+        for t in tunes:
+            if isinstance(t, Layer):
+                flattened.extend(t.tunes)
+            else:
+                flattened.append(t)
+        if len(flattened) == 1:
+            return flattened[0]
+        return Layer(*flattened)
+
 
 @dataclass(slots=True)
 class Tune(Composition):
@@ -213,6 +248,9 @@ class Tune(Composition):
 
     def __init__(self, *sounds: Composition) -> None:
         self.sounds = tuple(sounds)
+
+    def __repr__(self) -> str:
+        return f"Tune({', '.join(repr(s) for s in self.sounds)})"
 
     @property
     def beats(self) -> float:
@@ -240,6 +278,18 @@ class Tune(Composition):
 
     def with_effect(self, effect: Effect) -> Tune:
         return Tune(*(slot.with_effect(effect) for slot in self.sounds))
+
+    def _simplify(self) -> Composition:
+        sounds = [s.simplify() for s in self.sounds]
+        flattened: list[Composition] = []
+        for s in sounds:
+            if isinstance(s, Tune):
+                flattened.extend(s.sounds)
+            else:
+                flattened.append(s)
+        if len(flattened) == 1:
+            return flattened[0]
+        return Tune(*flattened)
 
 
 @cache
