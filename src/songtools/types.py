@@ -41,9 +41,6 @@ class Event:
     beat: float
     sound: Sound
 
-    def shifted(self, beats: float) -> Event:
-        return Event(self.beat + beats, self.sound)
-
 
 class KeyRoot(IntEnum):
     C = 0

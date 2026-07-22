@@ -47,16 +47,24 @@ Requires Python 3.14+ and [sounddevice](https://python-sounddevice.readthedocs.i
 
 Chain on any `Sound` with `@`:
 
-| Effect               | What it does                   |
-| -------------------- | ------------------------------ |
-| `Gain(amount)`       | Multiply amplitude             |
-| `Decay(duration)`    | Exponential fade (`timedelta`) |
-| `LowPass(hertz)`     | One-pole lowpass filter        |
-| `Echo(seconds)`      | Single-tap delay at −6 dB      |
-| `Gate(seconds)`      | Hard cut to length             |
-| `Reverse`            | Reverse the buffer             |
-| `Drive(amount)`      | Tanh saturation                |
-| `Humanize(velocity)` | Subtle gain variation          |
+| Effect                    | What it does                       |
+| ------------------------- | ---------------------------------- |
+| `Gain(amount)`            | Multiply amplitude                 |
+| `Decay(duration)`         | Exponential fade (`timedelta`)     |
+| `LowPass(hertz)`          | One-pole lowpass filter            |
+| `HighPass(hertz)`         | One-pole highpass filter           |
+| `Echo(seconds)`           | Single-tap delay at −6 dB          |
+| `Delay(seconds, fb, mix)` | Feedback delay with dry/wet blend  |
+| `Gate(seconds)`           | Hard cut to length                 |
+| `FadeIn(seconds)`         | Linear ramp up from silence        |
+| `FadeOut(seconds)`        | Linear ramp down to silence        |
+| `Reverse`                 | Reverse the buffer                 |
+| `Drive(amount)`           | Tanh saturation                    |
+| `Clip(threshold)`         | Hard-limit peaks                   |
+| `Normalize(peak)`         | Scale so the loudest sample = peak |
+| `Tremolo(hertz, depth)`   | Amplitude modulation               |
+| `BitCrush(bits)`          | Reduce bit depth (lo-fi)           |
+| `Humanize(velocity)`      | Subtle gain variation              |
 
 ## Quick start
 

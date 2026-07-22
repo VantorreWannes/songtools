@@ -167,7 +167,10 @@ class Shifted(Composition):
 
     def events(self, span: float) -> list[Event]:
         scale = span / self.beats
-        return _shifted_events(self.item, self.shift * scale, span)
+        offset = self.shift * scale
+        return [
+            Event(event.beat + offset, event.sound) for event in self.item.events(span)
+        ]
 
     def with_effect(self, effect: Effect) -> Shifted:
         return Shifted(self.item.with_effect(effect), self.shift)
@@ -190,7 +193,7 @@ class Layer(Composition):
     def events(self, span: float) -> list[Event]:
         scale = span / self.beats
         events = [
-            event.shifted(loop * tune.beats * scale)
+            Event(event.beat + loop * tune.beats * scale, event.sound)
             for tune in self.tunes
             for loop in range(int(self.beats // tune.beats))
             for event in tune.events(scale * tune.beats)
@@ -218,7 +221,7 @@ class Tune(Composition):
     def events(self, span: float) -> list[Event]:
         slot_beats = span / len(self.sounds)
         return [
-            event.shifted(index * slot_beats)
+            Event(event.beat + index * slot_beats, event.sound)
             for index, slot in enumerate(self.sounds)
             for event in slot.events(slot_beats)
         ]
@@ -272,7 +275,3 @@ def _chorded(sound: KeyedSound, chord: Chord | int) -> KeyedSound:
 @cache
 def _pitched(pitch: Pitch, buffer: Buffer) -> Buffer:
     return pitch.apply(buffer)
-
-
-def _shifted_events(item: Composition, shift: float, span: float) -> list[Event]:
-    return [event.shifted(shift) for event in item.events(span)]
