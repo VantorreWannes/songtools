@@ -1,4 +1,5 @@
 from songtools.lib import (
+    SAMPLE_RATE,
     BitCrush,
     Buffer,
     Clip,
@@ -31,6 +32,7 @@ from songtools.lib import (
 )
 
 __all__ = [
+    "SAMPLE_RATE",
     "BitCrush",
     "Buffer",
     "Clip",
