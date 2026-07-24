@@ -421,47 +421,6 @@ class Tremolo:
 
 
 @dataclass(frozen=True, slots=True)
-class TimeStretch:
-    rate: float
-
-    def apply(self, buffer: Buffer) -> Buffer:
-        if self.rate == 1.0 or len(buffer) == 0:
-            return buffer
-
-        source = buffer.array
-        src_len = len(source)
-
-        grain_len = int(0.08 * SAMPLE_RATE)
-        overlap = grain_len // 2
-        hop_in = overlap
-        hop_out = int(hop_in * self.rate)
-
-        target_len = int(src_len / self.rate)
-        output = _zeros(target_len + grain_len)
-
-        window = [
-            0.5 * (1.0 - math.cos(math.tau * i / grain_len)) for i in range(grain_len)
-        ]
-
-        in_pos = 0.0
-        out_pos = 0.0
-
-        while int(in_pos) < src_len - grain_len:
-            src_idx = int(in_pos)
-            out_idx = int(out_pos)
-
-            for j in range(grain_len):
-                if out_idx + j < len(output) and src_idx + j < src_len:
-                    output[out_idx + j] += source[src_idx + j] * window[j]
-
-            in_pos += hop_in
-            out_pos += hop_out
-
-        final_len = min(target_len, len(output))
-        return Buffer.from_data(output[:final_len])
-
-
-@dataclass(frozen=True, slots=True)
 class BitCrush:
     bits: int
 

@@ -26,7 +26,6 @@ from songtools.lib import (
     Reverse,
     Scale,
     Sound,
-    TimeStretch,
     Tremolo,
     WavFile,
 )
