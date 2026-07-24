@@ -1,6 +1,6 @@
 [project]
 name = "songtools"
-version = "0.3.2"
+version = "0.4.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [
@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "numpy>=2.5.1",
     "sounddevice>=0.5.5",
 ]
 
